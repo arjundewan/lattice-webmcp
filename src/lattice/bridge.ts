@@ -88,6 +88,8 @@ function assertNotAborted(signal: AbortSignal) {
 }
 
 export class LatticeBridge {
+  private isDrawingNode = false
+  private readonly restoreInitialShapeMeta: () => void
   private commentPointerStart: {
     point: { x: number; y: number }
     previousSelection: TLShapeId[]
@@ -97,7 +99,26 @@ export class LatticeBridge {
     readonly editor: Editor,
     readonly state: BridgeState,
     private readonly callbacks: BridgeCallbacks,
-  ) {}
+  ) {
+    const initialMetaForShape = editor.getInitialMetaForShape.bind(editor)
+    editor.getInitialMetaForShape = (shape) => {
+      const initialMeta = initialMetaForShape(shape)
+      if (!this.isDrawingNode || shape.type !== 'geo') return initialMeta
+
+      this.isDrawingNode = false
+      return {
+        ...initialMeta,
+        ...shapeMeta({ type: 'node', id: this.nextNodeId(), kind: 'service' }),
+      }
+    }
+    this.restoreInitialShapeMeta = () => {
+      editor.getInitialMetaForShape = initialMetaForShape
+    }
+  }
+
+  dispose() {
+    this.restoreInitialShapeMeta()
+  }
 
   get revision() {
     return this.state.revision
@@ -117,26 +138,25 @@ export class LatticeBridge {
     this.editor.setCurrentTool('comment')
   }
 
-  addNode() {
-    let index = this.nodeShapes().length + 1
-    while (this.findBySemanticId(`node${index}`)) index += 1
+  beginNodeDraw() {
+    this.isDrawingNode = true
+    this.editor.setCurrentTool('geo')
+  }
 
-    const semanticId = `node${index}`
-    const shapeId = createShapeId(`lattice-node-${semanticId}`)
-    const position = this.openNodePosition()
+  updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'geo'>) {
+    const selected = this.nodeShapes().filter(({ shape }) =>
+      this.editor.getSelectedShapeIds().includes(shape.id),
+    )
+    const [node] = selected
+    if (!node || selected.length !== 1) return
 
-    this.mutate('Add node', () => {
-      this.editor.createShape(
-        this.nodeRecord(
-          { id: semanticId, label: '', kind: 'service' },
-          position,
-        ),
-      )
+    this.mutate('Style node', () => {
+      this.editor.updateShape<TLGeoShape>({
+        id: node.shape.id,
+        type: 'geo',
+        props: style,
+      })
     })
-
-    this.editor.setCurrentTool('select')
-    this.editor.select(shapeId)
-    this.editor.setEditingShape(shapeId)
   }
 
   syncSelectHover() {
@@ -337,7 +357,7 @@ export class LatticeBridge {
               type: 'geo',
               props: {
                 ...(operation.label ? { richText: toRichText(operation.label) } : {}),
-                ...nodeAppearance[kind],
+                ...(operation.kind ? nodeAppearance[kind] : {}),
               },
               meta: shapeMeta({ ...node.meta, kind }),
             })
@@ -765,39 +785,10 @@ export class LatticeBridge {
     return { x: rightmost.shape.x + 280, y: rightmost.shape.y }
   }
 
-  private openNodePosition() {
-    const center = this.editor.getViewportPageBounds().center
-    const origin = {
-      x: center.x - NODE_WIDTH / 2,
-      y: center.y - NODE_HEIGHT / 2,
-    }
-    const xStep = NODE_WIDTH + 56
-    const yStep = NODE_HEIGHT + 56
-    const candidates = [
-      origin,
-      { x: origin.x, y: origin.y + yStep },
-      { x: origin.x, y: origin.y - yStep },
-      { x: origin.x + xStep, y: origin.y },
-      { x: origin.x - xStep, y: origin.y },
-      { x: origin.x + xStep, y: origin.y + yStep },
-      { x: origin.x - xStep, y: origin.y + yStep },
-    ]
-    const padding = 28
-    const occupied = this.nodeShapes()
-      .map(({ shape }) => this.editor.getShapePageBounds(shape))
-      .filter((bounds): bounds is NonNullable<typeof bounds> => Boolean(bounds))
-
-    return (
-      candidates.find((candidate) =>
-        occupied.every(
-          (bounds) =>
-            candidate.x + NODE_WIDTH + padding < bounds.x ||
-            candidate.x - padding > bounds.maxX ||
-            candidate.y + NODE_HEIGHT + padding < bounds.y ||
-            candidate.y - padding > bounds.maxY,
-        ),
-      ) ?? this.nextOpenPosition()
-    )
+  private nextNodeId() {
+    let index = this.nodeShapes().length + 1
+    while (this.findBySemanticId(`node${index}`)) index += 1
+    return `node${index}`
   }
 }
 

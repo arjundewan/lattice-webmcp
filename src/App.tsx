@@ -3,11 +3,14 @@ import {
   ArrowRight,
   Bot,
   BoxSelect,
+  Circle,
   Hand,
+  Hexagon,
   MessageSquare,
   MousePointer2,
   Redo2,
   Scan,
+  Square,
   SquarePlus,
   Undo2,
   ZoomIn,
@@ -24,6 +27,7 @@ import {
   type Editor,
   type TLComponents,
   type TLEventInfo,
+  type TLGeoShape,
 } from 'tldraw'
 import {
   createContext,
@@ -48,8 +52,9 @@ const COMMENT_TOOLS = [
 
 interface LatticeUiContextValue {
   title: string
-  addNode(): void
+  beginNodeDraw(): void
   beginComment(): void
+  updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'geo'>): void
 }
 
 const LatticeUiContext = createContext<LatticeUiContextValue | null>(null)
@@ -96,9 +101,105 @@ function ToolButton({
   )
 }
 
+const NODE_COLORS: Array<{
+  value: TLGeoShape['props']['color']
+  label: string
+  swatch: string
+}> = [
+  { value: 'blue', label: 'Blue', swatch: '#5b82d6' },
+  { value: 'violet', label: 'Violet', swatch: '#8a6ed1' },
+  { value: 'green', label: 'Green', swatch: '#4e9c78' },
+  { value: 'orange', label: 'Orange', swatch: '#c98647' },
+  { value: 'grey', label: 'Grey', swatch: '#75766e' },
+]
+
+const NODE_SHAPES: Array<{
+  value: TLGeoShape['props']['geo']
+  label: string
+  icon: typeof Square
+}> = [
+  { value: 'rectangle', label: 'Rectangle', icon: Square },
+  { value: 'ellipse', label: 'Ellipse', icon: Circle },
+  { value: 'hexagon', label: 'Hexagon', icon: Hexagon },
+]
+
+function selectedLatticeNode(editor: Editor) {
+  const selectedIds = editor.getSelectedShapeIds()
+  if (selectedIds.length !== 1) return null
+
+  const [selectedId] = selectedIds
+  if (!selectedId) return null
+  const shape = editor.getShape(selectedId)
+  const meta = shape?.meta.lattice
+  if (
+    shape?.type !== 'geo' ||
+    !meta ||
+    typeof meta !== 'object' ||
+    Array.isArray(meta) ||
+    (meta as { type?: unknown }).type !== 'node'
+  ) {
+    return null
+  }
+
+  return shape
+}
+
+function NodeStylePanel() {
+  const editor = useEditor()
+  const { updateSelectedNodeStyle } = useLatticeUi()
+  const node = useValue('selected Lattice node', () => selectedLatticeNode(editor), [editor])
+
+  if (!node) return null
+
+  return (
+    <aside className="node-style-panel" aria-label="Selected node style">
+      <div className="node-style-heading">Style</div>
+      <div className="node-style-section">
+        <span>Color</span>
+        <div className="node-style-options">
+          {NODE_COLORS.map((color) => (
+            <button
+              key={color.value}
+              type="button"
+              className={`node-color-option${node.props.color === color.value ? ' is-selected' : ''}`}
+              aria-label={`${color.label} node`}
+              aria-pressed={node.props.color === color.value}
+              title={color.label}
+              onClick={() => updateSelectedNodeStyle({ color: color.value, geo: node.props.geo })}
+            >
+              <span style={{ backgroundColor: color.swatch }} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="node-style-section">
+        <span>Shape</span>
+        <div className="node-style-options">
+          {NODE_SHAPES.map((shape) => {
+            const Icon = shape.icon
+            return (
+              <button
+                key={shape.value}
+                type="button"
+                className={`node-shape-option${node.props.geo === shape.value ? ' is-selected' : ''}`}
+                aria-label={`${shape.label} node`}
+                aria-pressed={node.props.geo === shape.value}
+                title={shape.label}
+                onClick={() => updateSelectedNodeStyle({ color: node.props.color, geo: shape.value })}
+              >
+                <Icon size={16} strokeWidth={1.8} />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </aside>
+  )
+}
+
 function CanvasChrome() {
   const editor = useEditor()
-  const { title, addNode, beginComment } = useLatticeUi()
+  const { title, beginNodeDraw, beginComment } = useLatticeUi()
   const currentTool = useValue('current tool', () => editor.getCurrentToolId(), [editor])
   const shapeCount = useValue('shape count', () => editor.getCurrentPageShapes().length, [editor])
   const openComments = useValue(
@@ -145,7 +246,7 @@ function CanvasChrome() {
           <Hand size={18} />
         </ToolButton>
         <span className="toolbar-divider" />
-        <ToolButton label="Add node (N)" onClick={addNode}>
+        <ToolButton label="Draw node (N)" active={currentTool === 'geo'} onClick={beginNodeDraw}>
           <SquarePlus size={18} />
         </ToolButton>
         <ToolButton
@@ -188,6 +289,7 @@ function CanvasChrome() {
           <ZoomIn size={17} />
         </ToolButton>
       </div>
+      <NodeStylePanel />
     </>
   )
 }
@@ -284,6 +386,7 @@ export function App() {
       return () => {
         stopListening()
         editor.off('event', handleEditorEvent)
+        bridge.dispose()
         bridgeRef.current = null
         persistNow()
       }
@@ -315,7 +418,7 @@ export function App() {
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault()
         event.stopPropagation()
-        bridge.addNode()
+        bridge.beginNodeDraw()
       }
     }
 
@@ -334,11 +437,14 @@ export function App() {
   const ui = useMemo<LatticeUiContextValue>(
     () => ({
       title,
-      addNode() {
-        bridgeRef.current?.addNode()
+      beginNodeDraw() {
+        bridgeRef.current?.beginNodeDraw()
       },
       beginComment() {
         bridgeRef.current?.beginComment()
+      },
+      updateSelectedNodeStyle(style) {
+        bridgeRef.current?.updateSelectedNodeStyle(style)
       },
     }),
     [title],

@@ -8,6 +8,7 @@ import {
   MousePointer2,
   Redo2,
   Scan,
+  SquarePlus,
   Undo2,
   ZoomIn,
   ZoomOut,
@@ -22,6 +23,7 @@ import {
   useValue,
   type Editor,
   type TLComponents,
+  type TLEventInfo,
 } from 'tldraw'
 import {
   createContext,
@@ -31,6 +33,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
 import { LatticeBridge, type BridgeState } from './lattice/bridge'
@@ -45,6 +48,7 @@ const COMMENT_TOOLS = [
 
 interface LatticeUiContextValue {
   title: string
+  addNode(): void
   beginComment(): void
 }
 
@@ -94,7 +98,7 @@ function ToolButton({
 
 function CanvasChrome() {
   const editor = useEditor()
-  const { title, beginComment } = useLatticeUi()
+  const { title, addNode, beginComment } = useLatticeUi()
   const currentTool = useValue('current tool', () => editor.getCurrentToolId(), [editor])
   const shapeCount = useValue('shape count', () => editor.getCurrentPageShapes().length, [editor])
   const openComments = useValue(
@@ -114,10 +118,6 @@ function CanvasChrome() {
             <div className="brand-name">Lattice</div>
             <div className="document-title">{title}</div>
           </div>
-        </div>
-        <div className="status-pill" title="This diagram is saved in this browser">
-          <span className="status-dot" />
-          Local
         </div>
       </header>
 
@@ -145,6 +145,9 @@ function CanvasChrome() {
           <Hand size={18} />
         </ToolButton>
         <span className="toolbar-divider" />
+        <ToolButton label="Add node" onClick={addNode}>
+          <SquarePlus size={18} />
+        </ToolButton>
         <ToolButton
           label="Connector (A)"
           active={currentTool === 'arrow'}
@@ -267,8 +270,13 @@ export function App() {
         },
         { scope: 'document', source: 'user' },
       )
-      const handleEditorEvent = (event: { name: string }) => {
-        if (event.name === 'pointer_up' || event.name === 'key_up') bridge.noteUserChange()
+      const handleEditorEvent = (event: TLEventInfo) => {
+        if (event.name === 'pointer_move') bridge.syncSelectHover()
+        if (event.name === 'pointer_down') bridge.clearSelectHover()
+        if (event.type === 'pointer' && event.name === 'pointer_up') {
+          bridge.noteUserChange()
+        }
+        if (event.name === 'key_up') bridge.noteUserChange()
       }
       editor.on('event', handleEditorEvent)
       queueMicrotask(() => bridge.captureUntrackedCommentTargets())
@@ -296,6 +304,9 @@ export function App() {
   const ui = useMemo<LatticeUiContextValue>(
     () => ({
       title,
+      addNode() {
+        bridgeRef.current?.addNode()
+      },
       beginComment() {
         bridgeRef.current?.beginComment()
       },
@@ -303,8 +314,32 @@ export function App() {
     [title],
   )
 
+  const handlePointerDownCapture = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('button, input, textarea, [contenteditable="true"]')
+    ) {
+      return
+    }
+    bridgeRef.current?.captureCommentPointerDown({ x: event.clientX, y: event.clientY })
+  }, [])
+
+  const handlePointerMoveCapture = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    bridgeRef.current?.cancelCommentSelectionOnDrag({ x: event.clientX, y: event.clientY })
+  }, [])
+
+  const handlePointerUpCapture = useCallback(() => {
+    bridgeRef.current?.finishCommentPointer()
+  }, [])
+
   return (
-    <main className="app-shell" aria-label="Lattice architecture canvas">
+    <main
+      className="app-shell"
+      aria-label="Lattice architecture canvas"
+      onPointerDownCapture={handlePointerDownCapture}
+      onPointerMoveCapture={handlePointerMoveCapture}
+      onPointerUpCapture={handlePointerUpCapture}
+    >
       <LatticeUiContext.Provider value={ui}>
         <Tldraw
           autoFocus

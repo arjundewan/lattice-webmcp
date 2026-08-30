@@ -88,6 +88,11 @@ function assertNotAborted(signal: AbortSignal) {
 }
 
 export class LatticeBridge {
+  private commentPointerStart: {
+    point: { x: number; y: number }
+    previousSelection: TLShapeId[]
+  } | null = null
+
   constructor(
     readonly editor: Editor,
     readonly state: BridgeState,
@@ -108,7 +113,81 @@ export class LatticeBridge {
     this.state.selectionAtCommentStart = this.editor
       .getSelectedShapeIds()
       .filter((id) => this.isLatticeShape(id))
+    this.editor.setHintingShapes([])
     this.editor.setCurrentTool('comment')
+  }
+
+  addNode() {
+    let index = this.nodeShapes().length + 1
+    while (this.findBySemanticId(`node${index}`)) index += 1
+
+    const semanticId = `node${index}`
+    const shapeId = createShapeId(`lattice-node-${semanticId}`)
+    const position = this.openNodePosition()
+
+    this.mutate('Add node', () => {
+      this.editor.createShape(
+        this.nodeRecord(
+          { id: semanticId, label: '', kind: 'service' },
+          position,
+        ),
+      )
+    })
+
+    this.editor.setCurrentTool('select')
+    this.editor.select(shapeId)
+    this.editor.setEditingShape(shapeId)
+  }
+
+  syncSelectHover() {
+    if (this.editor.getCurrentToolId() !== 'select' || this.editor.inputs.getIsDragging()) return
+    const hoveredId = this.editor.getHoveredShapeId()
+    const next = hoveredId && this.isLatticeShape(hoveredId) ? [hoveredId] : []
+    const current = this.editor.getHintingShapeIds()
+    if (current.length === next.length && current.every((id, index) => id === next[index])) return
+    this.editor.setHintingShapes(next)
+  }
+
+  clearSelectHover() {
+    if (this.editor.getCurrentToolId() === 'select') this.editor.setHintingShapes([])
+  }
+
+  captureCommentPointerDown(point: { x: number; y: number }) {
+    this.commentPointerStart = null
+    if (this.editor.getCurrentToolId() !== 'comment') return
+
+    const pagePoint = this.editor.screenToPage(point)
+    const shape = this.editor.getShapeAtPoint(pagePoint, {
+      hitInside: true,
+      hitLabels: true,
+      margin: 8 / this.editor.getZoomLevel(),
+      filter: (candidate) => this.isLatticeShape(candidate.id),
+    })
+    if (!shape || !this.isLatticeShape(shape.id)) return
+
+    const previousSelection = [...this.state.selectionAtCommentStart]
+    const selection = new Set(previousSelection)
+    selection.add(shape.id)
+    this.state.selectionAtCommentStart = [...selection]
+    this.editor.setSelectedShapes(this.state.selectionAtCommentStart)
+    this.editor.setHintingShapes(this.state.selectionAtCommentStart)
+    this.commentPointerStart = {
+      point,
+      previousSelection,
+    }
+  }
+
+  cancelCommentSelectionOnDrag(point: { x: number; y: number }) {
+    const start = this.commentPointerStart
+    if (!start || Math.hypot(point.x - start.point.x, point.y - start.point.y) <= 5) return
+
+    this.state.selectionAtCommentStart = start.previousSelection
+    this.editor.setSelectedShapes(start.previousSelection)
+    this.commentPointerStart = null
+  }
+
+  finishCommentPointer() {
+    this.commentPointerStart = null
   }
 
   captureUntrackedCommentTargets() {
@@ -684,6 +763,41 @@ export class LatticeBridge {
     if (nodes.length === 0) return { x: 0, y: 0 }
     const rightmost = nodes.reduce((best, item) => (item.shape.x > best.shape.x ? item : best))
     return { x: rightmost.shape.x + 280, y: rightmost.shape.y }
+  }
+
+  private openNodePosition() {
+    const center = this.editor.getViewportPageBounds().center
+    const origin = {
+      x: center.x - NODE_WIDTH / 2,
+      y: center.y - NODE_HEIGHT / 2,
+    }
+    const xStep = NODE_WIDTH + 56
+    const yStep = NODE_HEIGHT + 56
+    const candidates = [
+      origin,
+      { x: origin.x, y: origin.y + yStep },
+      { x: origin.x, y: origin.y - yStep },
+      { x: origin.x + xStep, y: origin.y },
+      { x: origin.x - xStep, y: origin.y },
+      { x: origin.x + xStep, y: origin.y + yStep },
+      { x: origin.x - xStep, y: origin.y + yStep },
+    ]
+    const padding = 28
+    const occupied = this.nodeShapes()
+      .map(({ shape }) => this.editor.getShapePageBounds(shape))
+      .filter((bounds): bounds is NonNullable<typeof bounds> => Boolean(bounds))
+
+    return (
+      candidates.find((candidate) =>
+        occupied.every(
+          (bounds) =>
+            candidate.x + NODE_WIDTH + padding < bounds.x ||
+            candidate.x - padding > bounds.maxX ||
+            candidate.y + NODE_HEIGHT + padding < bounds.y ||
+            candidate.y - padding > bounds.maxY,
+        ),
+      ) ?? this.nextOpenPosition()
+    )
   }
 }
 

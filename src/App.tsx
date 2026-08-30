@@ -145,7 +145,7 @@ function CanvasChrome() {
           <Hand size={18} />
         </ToolButton>
         <span className="toolbar-divider" />
-        <ToolButton label="Add node" onClick={addNode}>
+        <ToolButton label="Add node (N)" onClick={addNode}>
           <SquarePlus size={18} />
         </ToolButton>
         <ToolButton
@@ -292,6 +292,36 @@ export function App() {
   )
 
   useEffect(() => registerLatticeTools(() => bridgeRef.current), [])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return
+      if (
+        event.target instanceof Element &&
+        event.target.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return
+      }
+
+      const bridge = bridgeRef.current
+      if (!bridge) return
+
+      if (event.key.toLowerCase() === 'c') {
+        event.preventDefault()
+        event.stopPropagation()
+        bridge.beginComment()
+      }
+
+      if (event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        event.stopPropagation()
+        bridge.addNode()
+      }
+    }
+
+    window.addEventListener('keydown', handleShortcut, true)
+    return () => window.removeEventListener('keydown', handleShortcut, true)
+  }, [])
 
   useEffect(() => {
     const handleVisibility = () => {

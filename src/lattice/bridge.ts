@@ -349,6 +349,11 @@ export class LatticeBridge {
     if (captured) {
       this.state.selectionAtCommentStart = []
       this.bumpRevision()
+      // tldraw returns to select after a new thread is posted. Restore comment mode after the
+      // post completes so people can place several annotations without reselecting the tool.
+      queueMicrotask(() => {
+        if (this.editor.getCurrentToolId() === 'select') this.editor.setCurrentTool('comment')
+      })
     }
   }
 

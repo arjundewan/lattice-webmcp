@@ -10,7 +10,13 @@ import {
   type TLShape,
   type TLShapeId,
 } from 'tldraw'
-import { DefaultFillStyle } from '@tldraw/tlschema'
+import {
+  DefaultColorStyle,
+  DefaultDashStyle,
+  DefaultFillStyle,
+  DefaultSizeStyle,
+  GeoShapeGeoStyle,
+} from '@tldraw/tlschema'
 import {
   getLiveComments,
   getLiveCommentThreads,
@@ -35,6 +41,7 @@ import { NODE_KINDS } from './types'
 
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 84
+const NODE_APPEARANCE_VERSION = 2
 const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
 const nodeAppearance: Record<
@@ -42,10 +49,10 @@ const nodeAppearance: Record<
   Pick<TLGeoShape['props'], 'color' | 'fill' | 'geo'>
 > = {
   client: { color: 'blue', fill: 'solid', geo: 'rectangle' },
-  service: { color: 'violet', fill: 'solid', geo: 'rectangle' },
-  data: { color: 'green', fill: 'solid', geo: 'ellipse' },
-  queue: { color: 'orange', fill: 'solid', geo: 'hexagon' },
-  external: { color: 'grey', fill: 'solid', geo: 'rectangle' },
+  service: { color: 'blue', fill: 'solid', geo: 'rectangle' },
+  data: { color: 'blue', fill: 'solid', geo: 'rectangle' },
+  queue: { color: 'blue', fill: 'solid', geo: 'rectangle' },
+  external: { color: 'blue', fill: 'solid', geo: 'rectangle' },
 }
 
 interface BridgeState {
@@ -109,7 +116,13 @@ export class LatticeBridge {
       this.isDrawingNode = false
       return {
         ...initialMeta,
-        ...shapeMeta({ type: 'node', id: this.nextNodeId(), kind: 'service' }),
+        ...shapeMeta({
+          type: 'node',
+          id: this.nextNodeId(),
+          kind: 'service',
+          customStyle: true,
+          appearanceVersion: NODE_APPEARANCE_VERSION,
+        }),
       }
     }
     this.restoreInitialShapeMeta = () => {
@@ -141,7 +154,11 @@ export class LatticeBridge {
 
   beginNodeDraw() {
     this.isDrawingNode = true
+    this.editor.setStyleForNextShapes(DefaultColorStyle, 'blue')
+    this.editor.setStyleForNextShapes(DefaultDashStyle, 'solid')
     this.editor.setStyleForNextShapes(DefaultFillStyle, 'solid')
+    this.editor.setStyleForNextShapes(DefaultSizeStyle, 's')
+    this.editor.setStyleForNextShapes(GeoShapeGeoStyle, 'rectangle')
     this.editor.setCurrentTool('geo')
   }
 
@@ -157,8 +174,44 @@ export class LatticeBridge {
         id: node.shape.id,
         type: 'geo',
         props: style,
+        meta: shapeMeta({
+          ...node.meta,
+          customStyle: true,
+          appearanceVersion: NODE_APPEARANCE_VERSION,
+        }),
       })
     })
+  }
+
+  normalizeNodeAppearance() {
+    const nodesToNormalize = this.nodeShapes().filter(
+      ({ meta }) => meta.appearanceVersion !== NODE_APPEARANCE_VERSION,
+    )
+    if (nodesToNormalize.length === 0) return
+
+    this.state.isMutating = true
+    try {
+      this.editor.updateShapes<TLGeoShape>(
+        nodesToNormalize.map(({ shape, meta }) => ({
+          id: shape.id,
+          type: 'geo',
+          props: {
+            color: meta.appearanceVersion === undefined ? 'blue' : shape.props.color,
+            fill: 'solid',
+            geo: meta.appearanceVersion === undefined ? 'rectangle' : shape.props.geo,
+            dash: 'solid',
+            size: 's',
+          },
+          meta: shapeMeta({
+            ...meta,
+            appearanceVersion: NODE_APPEARANCE_VERSION,
+          }),
+        })),
+      )
+    } finally {
+      this.state.isMutating = false
+    }
+    this.bumpRevision()
   }
 
   syncSelectHover() {
@@ -544,7 +597,12 @@ export class LatticeBridge {
         verticalAlign: 'middle' as const,
         ...nodeAppearance[node.kind],
       },
-      meta: shapeMeta({ type: 'node', id: node.id, kind: node.kind }),
+      meta: shapeMeta({
+        type: 'node',
+        id: node.id,
+        kind: node.kind,
+        appearanceVersion: NODE_APPEARANCE_VERSION,
+      }),
     }
   }
 

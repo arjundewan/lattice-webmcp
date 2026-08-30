@@ -365,6 +365,7 @@ export function App() {
         },
       })
       bridgeRef.current = bridge
+      bridge.normalizeNodeAppearance()
 
       const stopListening = editor.store.listen(
         () => {

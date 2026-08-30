@@ -60,6 +60,8 @@ export interface LatticeElementMeta {
   type: 'node' | 'edge'
   id: string
   kind?: NodeKind
+  customStyle?: boolean
+  appearanceVersion?: number
   source?: string
   target?: string
 }

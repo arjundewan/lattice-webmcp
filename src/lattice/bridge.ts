@@ -95,6 +95,63 @@ function assertNotAborted(signal: AbortSignal) {
   if (signal.aborted) throw new DOMException('Tool execution aborted.', 'AbortError')
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function assertPatchOperations(value: unknown): asserts value is PatchOperation[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('At least one patch operation is required.')
+  }
+
+  for (const [index, operation] of value.entries()) {
+    if (!isRecord(operation) || typeof operation.type !== 'string') {
+      throw new Error(`Patch operation ${index + 1} needs a supported type.`)
+    }
+
+    const needsId = () => {
+      if (typeof operation.id !== 'string') {
+        throw new Error(`Patch operation ${index + 1} needs an element ID.`)
+      }
+    }
+
+    switch (operation.type) {
+      case 'add_node':
+        needsId()
+        if (typeof operation.label !== 'string' || typeof operation.kind !== 'string') {
+          throw new Error(`Add-node operation ${operation.id} needs a label and kind.`)
+        }
+        break
+      case 'update_node':
+        needsId()
+        if (typeof operation.label !== 'string' && typeof operation.kind !== 'string') {
+          throw new Error(`Update-node operation ${operation.id} needs a label or kind.`)
+        }
+        break
+      case 'remove_node':
+        needsId()
+        break
+      case 'add_edge':
+        needsId()
+        if (typeof operation.source !== 'string' || typeof operation.target !== 'string') {
+          throw new Error(`Add-edge operation ${operation.id} needs source and target IDs.`)
+        }
+        break
+      case 'update_edge':
+        needsId()
+        if (typeof operation.label !== 'string') {
+          throw new Error(`Update-edge operation ${operation.id} needs a label.`)
+        }
+        break
+      case 'remove_edge':
+        needsId()
+        break
+      default:
+        throw new Error(`Unsupported patch operation type: ${operation.type}`)
+    }
+  }
+}
+
 export class LatticeBridge {
   private isDrawingNode = false
   private readonly restoreInitialShapeMeta: () => void
@@ -373,9 +430,7 @@ export class LatticeBridge {
   applyDiagramPatch(input: ApplyDiagramPatchInput, signal: AbortSignal) {
     assertNotAborted(signal)
     this.assertRevision(input.expectedRevision)
-    if (!Array.isArray(input.operations) || input.operations.length === 0) {
-      throw new Error('At least one patch operation is required.')
-    }
+    assertPatchOperations(input.operations)
 
     const allowedShapeIds = input.targetCommentId
       ? new Set(this.commentTargetShapeIds(input.targetCommentId))

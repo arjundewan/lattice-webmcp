@@ -10,6 +10,7 @@ import {
   type TLShape,
   type TLShapeId,
 } from 'tldraw'
+import { DefaultFillStyle } from '@tldraw/tlschema'
 import {
   getLiveComments,
   getLiveCommentThreads,
@@ -140,10 +141,11 @@ export class LatticeBridge {
 
   beginNodeDraw() {
     this.isDrawingNode = true
+    this.editor.setStyleForNextShapes(DefaultFillStyle, 'solid')
     this.editor.setCurrentTool('geo')
   }
 
-  updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'geo'>) {
+  updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'fill' | 'geo'>) {
     const selected = this.nodeShapes().filter(({ shape }) =>
       this.editor.getSelectedShapeIds().includes(shape.id),
     )

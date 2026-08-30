@@ -5,13 +5,13 @@ import {
   BoxSelect,
   Circle,
   Hand,
-  Hexagon,
   MessageSquare,
   MousePointer2,
   Redo2,
   Scan,
   Square,
   SquarePlus,
+  Triangle,
   Undo2,
   ZoomIn,
   ZoomOut,
@@ -54,7 +54,7 @@ interface LatticeUiContextValue {
   title: string
   beginNodeDraw(): void
   beginComment(): void
-  updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'geo'>): void
+  updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'fill' | 'geo'>): void
 }
 
 const LatticeUiContext = createContext<LatticeUiContextValue | null>(null)
@@ -120,7 +120,7 @@ const NODE_SHAPES: Array<{
 }> = [
   { value: 'rectangle', label: 'Rectangle', icon: Square },
   { value: 'ellipse', label: 'Ellipse', icon: Circle },
-  { value: 'hexagon', label: 'Hexagon', icon: Hexagon },
+  { value: 'triangle', label: 'Triangle', icon: Triangle },
 ]
 
 function selectedLatticeNode(editor: Editor) {
@@ -153,9 +153,7 @@ function NodeStylePanel() {
 
   return (
     <aside className="node-style-panel" aria-label="Selected node style">
-      <div className="node-style-heading">Style</div>
       <div className="node-style-section">
-        <span>Color</span>
         <div className="node-style-options">
           {NODE_COLORS.map((color) => (
             <button
@@ -165,7 +163,9 @@ function NodeStylePanel() {
               aria-label={`${color.label} node`}
               aria-pressed={node.props.color === color.value}
               title={color.label}
-              onClick={() => updateSelectedNodeStyle({ color: color.value, geo: node.props.geo })}
+              onClick={() =>
+                updateSelectedNodeStyle({ color: color.value, fill: 'solid', geo: node.props.geo })
+              }
             >
               <span style={{ backgroundColor: color.swatch }} />
             </button>
@@ -173,7 +173,6 @@ function NodeStylePanel() {
         </div>
       </div>
       <div className="node-style-section">
-        <span>Shape</span>
         <div className="node-style-options">
           {NODE_SHAPES.map((shape) => {
             const Icon = shape.icon
@@ -185,7 +184,9 @@ function NodeStylePanel() {
                 aria-label={`${shape.label} node`}
                 aria-pressed={node.props.geo === shape.value}
                 title={shape.label}
-                onClick={() => updateSelectedNodeStyle({ color: node.props.color, geo: shape.value })}
+                onClick={() =>
+                  updateSelectedNodeStyle({ color: node.props.color, fill: 'solid', geo: shape.value })
+                }
               >
                 <Icon size={16} strokeWidth={1.8} />
               </button>

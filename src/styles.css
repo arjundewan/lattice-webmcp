@@ -1,0 +1,277 @@
+:root {
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #22231f;
+  background: #f7f7f4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #f7f7f4;
+}
+
+.tl-container {
+  --color-background: #f7f7f4;
+  --color-low: #ecece7;
+  --color-low-border: #deded7;
+  --color-text: #252621;
+  --color-selected: #6957d7;
+  --color-selection-stroke: #6957d7;
+  --color-selection-fill: rgba(105, 87, 215, 0.08);
+}
+
+.topbar {
+  position: absolute;
+  z-index: 500;
+  top: 18px;
+  right: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.brand-lockup {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: #24251f;
+  box-shadow: 0 5px 18px rgba(37, 38, 33, 0.14);
+}
+
+.brand-name {
+  color: #20211d;
+  font-size: 14px;
+  font-weight: 690;
+  letter-spacing: -0.01em;
+}
+
+.document-title {
+  max-width: min(54vw, 460px);
+  overflow: hidden;
+  color: #7a7b73;
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  color: #686960;
+  border: 1px solid rgba(50, 51, 45, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 255, 253, 0.9);
+  box-shadow: 0 4px 16px rgba(41, 42, 36, 0.06);
+  font-size: 11px;
+  font-weight: 620;
+  backdrop-filter: blur(16px);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2da071;
+  box-shadow: 0 0 0 3px rgba(45, 160, 113, 0.12);
+}
+
+.primary-toolbar,
+.history-toolbar,
+.zoom-toolbar {
+  position: absolute;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid rgba(44, 45, 39, 0.11);
+  border-radius: 13px;
+  background: rgba(255, 255, 253, 0.94);
+  box-shadow:
+    0 14px 34px rgba(42, 43, 37, 0.11),
+    0 2px 7px rgba(42, 43, 37, 0.05);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.primary-toolbar {
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.history-toolbar {
+  bottom: 22px;
+  left: 20px;
+}
+
+.zoom-toolbar {
+  right: 20px;
+  bottom: 22px;
+}
+
+.tool-button {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  color: #67685f;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.tool-button:hover {
+  color: #24251f;
+  background: #f0f0eb;
+}
+
+.tool-button:active {
+  transform: scale(0.96);
+}
+
+.tool-button:focus-visible {
+  outline: 2px solid #6957d7;
+  outline-offset: 2px;
+}
+
+.tool-button.is-active {
+  color: #fff;
+  background: #24251f;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 2px;
+  background: #e4e4de;
+}
+
+.tool-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  place-items: center;
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #6957d7;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.empty-canvas {
+  position: absolute;
+  z-index: 200;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: min(360px, calc(100vw - 48px));
+  align-items: center;
+  flex-direction: column;
+  transform: translate(-50%, -54%);
+  color: #77786f;
+  text-align: center;
+  pointer-events: none;
+}
+
+.empty-canvas .empty-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 13px;
+  place-items: center;
+  color: #56574f;
+  border: 1px solid #deded7;
+  border-radius: 12px;
+  background: rgba(255, 255, 253, 0.78);
+}
+
+.empty-canvas p {
+  margin: 0 0 5px;
+  color: #44453f;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.empty-canvas span {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+@media (max-width: 680px) {
+  .history-toolbar {
+    display: none;
+  }
+
+  .zoom-toolbar {
+    right: 12px;
+    bottom: 76px;
+    flex-direction: column;
+  }
+
+  .primary-toolbar {
+    bottom: 14px;
+  }
+
+  .topbar {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+  }
+}

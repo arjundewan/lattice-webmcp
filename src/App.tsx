@@ -54,6 +54,8 @@ interface LatticeUiContextValue {
   title: string
   beginNodeDraw(): void
   beginComment(): void
+  undo(): void
+  redo(): void
   updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'fill' | 'geo'>): void
 }
 
@@ -200,7 +202,7 @@ function NodeStylePanel() {
 
 function CanvasChrome() {
   const editor = useEditor()
-  const { title, beginNodeDraw, beginComment } = useLatticeUi()
+  const { title, beginNodeDraw, beginComment, undo, redo } = useLatticeUi()
   const currentTool = useValue('current tool', () => editor.getCurrentToolId(), [editor])
   const shapeCount = useValue('shape count', () => editor.getCurrentPageShapes().length, [editor])
   const openComments = useValue(
@@ -268,10 +270,10 @@ function CanvasChrome() {
       </div>
 
       <div className="history-toolbar" role="toolbar" aria-label="Edit history">
-        <ToolButton label="Undo" onClick={() => editor.undo()}>
+        <ToolButton label="Undo" onClick={undo}>
           <Undo2 size={17} />
         </ToolButton>
-        <ToolButton label="Redo" onClick={() => editor.redo()}>
+        <ToolButton label="Redo" onClick={redo}>
           <Redo2 size={17} />
         </ToolButton>
       </div>
@@ -444,6 +446,12 @@ export function App() {
       },
       beginComment() {
         bridgeRef.current?.beginComment()
+      },
+      undo() {
+        bridgeRef.current?.undo()
+      },
+      redo() {
+        bridgeRef.current?.redo()
       },
       updateSelectedNodeStyle(style) {
         bridgeRef.current?.updateSelectedNodeStyle(style)

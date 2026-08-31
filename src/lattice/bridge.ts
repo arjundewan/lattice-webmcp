@@ -37,12 +37,17 @@ import type {
   PersistedCommentTarget,
   ResolveCommentInput,
 } from './types'
-import { NODE_KINDS } from './types'
+import {
+  LATTICE_DIRECTIONS,
+  LATTICE_ID_PATTERN,
+  LATTICE_LIMITS,
+  NODE_KINDS,
+} from './types'
 
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 84
 const NODE_APPEARANCE_VERSION = 2
-const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
+const ID_PATTERN = new RegExp(LATTICE_ID_PATTERN)
 
 const nodeAppearance: Record<
   NodeKind,
@@ -79,16 +84,67 @@ function shapeMeta(meta: LatticeElementMeta): JsonObject {
   return { lattice: meta as unknown as JsonObject }
 }
 
-function assertId(id: string, label = 'ID') {
-  if (!ID_PATTERN.test(id)) {
+function assertId(id: unknown, label = 'ID'): asserts id is string {
+  if (
+    typeof id !== 'string' ||
+    id.length === 0 ||
+    id.length > LATTICE_LIMITS.id ||
+    !ID_PATTERN.test(id)
+  ) {
     throw new Error(`${label} must start with a letter and contain only letters, numbers, _ or -.`)
   }
 }
 
-function assertNodeKind(kind: string): asserts kind is NodeKind {
-  if (!(NODE_KINDS as readonly string[]).includes(kind)) {
+function assertNodeKind(kind: unknown): asserts kind is NodeKind {
+  if (typeof kind !== 'string' || !(NODE_KINDS as readonly string[]).includes(kind)) {
     throw new Error(`Unsupported node kind: ${kind}`)
   }
+}
+
+function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`)
+}
+
+function assertKnownKeys(value: Record<string, unknown>, keys: readonly string[], label: string) {
+  const allowed = new Set(keys)
+  const unknown = Object.keys(value).find((key) => !allowed.has(key))
+  if (unknown) throw new Error(`${label} contains unsupported field: ${unknown}.`)
+}
+
+function assertString(
+  value: unknown,
+  label: string,
+  { minLength = 0, maxLength }: { minLength?: number; maxLength?: number } = {},
+): asserts value is string {
+  if (typeof value !== 'string') throw new Error(`${label} must be a string.`)
+  if (value.length < minLength) throw new Error(`${label} must be at least ${minLength} character(s).`)
+  if (maxLength !== undefined && value.length > maxLength) {
+    throw new Error(`${label} must be at most ${maxLength} characters.`)
+  }
+}
+
+function assertOptionalString(
+  value: Record<string, unknown>,
+  key: string,
+  label: string,
+  options: { minLength?: number; maxLength?: number } = {},
+) {
+  if (key in value) assertString(value[key], label, options)
+}
+
+function assertInteger(value: unknown, label: string) {
+  if (!Number.isInteger(value) || (value as number) < 0) {
+    throw new Error(`${label} must be a non-negative integer.`)
+  }
+}
+
+function assertBoolean(value: unknown, label: string): asserts value is boolean {
+  if (typeof value !== 'boolean') throw new Error(`${label} must be a boolean.`)
+}
+
+function assertArray(value: unknown, label: string, maxLength: number): asserts value is unknown[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`)
+  if (value.length > maxLength) throw new Error(`${label} may contain at most ${maxLength} items.`)
 }
 
 function assertNotAborted(signal: AbortSignal) {
@@ -103,48 +159,69 @@ function assertPatchOperations(value: unknown): asserts value is PatchOperation[
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error('At least one patch operation is required.')
   }
+  if (value.length > LATTICE_LIMITS.patchOperations) {
+    throw new Error(`Patch operations may contain at most ${LATTICE_LIMITS.patchOperations} items.`)
+  }
 
   for (const [index, operation] of value.entries()) {
-    if (!isRecord(operation) || typeof operation.type !== 'string') {
+    assertRecord(operation, `Patch operation ${index + 1}`)
+    if (typeof operation.type !== 'string') {
       throw new Error(`Patch operation ${index + 1} needs a supported type.`)
-    }
-
-    const needsId = () => {
-      if (typeof operation.id !== 'string') {
-        throw new Error(`Patch operation ${index + 1} needs an element ID.`)
-      }
     }
 
     switch (operation.type) {
       case 'add_node':
-        needsId()
-        if (typeof operation.label !== 'string' || typeof operation.kind !== 'string') {
-          throw new Error(`Add-node operation ${operation.id} needs a label and kind.`)
+        assertKnownKeys(operation, ['type', 'id', 'label', 'kind', 'near', 'direction'], 'Add-node operation')
+        assertId(operation.id, `Add-node operation ${index + 1} ID`)
+        assertString(operation.label, `Add-node operation ${index + 1} label`, {
+          minLength: 1,
+          maxLength: LATTICE_LIMITS.label,
+        })
+        assertNodeKind(operation.kind)
+        if ('near' in operation) assertId(operation.near, `Add-node operation ${index + 1} near`)
+        if ('direction' in operation) {
+          if (
+            typeof operation.direction !== 'string' ||
+            !(LATTICE_DIRECTIONS as readonly string[]).includes(operation.direction)
+          ) {
+            throw new Error(`Add-node operation ${index + 1} direction is unsupported.`)
+          }
         }
         break
       case 'update_node':
-        needsId()
-        if (typeof operation.label !== 'string' && typeof operation.kind !== 'string') {
-          throw new Error(`Update-node operation ${operation.id} needs a label or kind.`)
+        assertKnownKeys(operation, ['type', 'id', 'label', 'kind'], 'Update-node operation')
+        assertId(operation.id, `Update-node operation ${index + 1} ID`)
+        assertOptionalString(operation, 'label', `Update-node operation ${index + 1} label`, {
+          maxLength: LATTICE_LIMITS.label,
+        })
+        if ('kind' in operation) assertNodeKind(operation.kind)
+        if (!('label' in operation) && !('kind' in operation)) {
+          throw new Error(`Update-node operation ${index + 1} needs a label or kind.`)
         }
         break
       case 'remove_node':
-        needsId()
+        assertKnownKeys(operation, ['type', 'id'], 'Remove-node operation')
+        assertId(operation.id, `Remove-node operation ${index + 1} ID`)
         break
       case 'add_edge':
-        needsId()
-        if (typeof operation.source !== 'string' || typeof operation.target !== 'string') {
-          throw new Error(`Add-edge operation ${operation.id} needs source and target IDs.`)
-        }
+        assertKnownKeys(operation, ['type', 'id', 'source', 'target', 'label'], 'Add-edge operation')
+        assertId(operation.id, `Add-edge operation ${index + 1} ID`)
+        assertId(operation.source, `Add-edge operation ${index + 1} source`)
+        assertId(operation.target, `Add-edge operation ${index + 1} target`)
+        assertOptionalString(operation, 'label', `Add-edge operation ${index + 1} label`, {
+          maxLength: LATTICE_LIMITS.label,
+        })
         break
       case 'update_edge':
-        needsId()
-        if (typeof operation.label !== 'string') {
-          throw new Error(`Update-edge operation ${operation.id} needs a label.`)
-        }
+        assertKnownKeys(operation, ['type', 'id', 'label'], 'Update-edge operation')
+        assertId(operation.id, `Update-edge operation ${index + 1} ID`)
+        assertString(operation.label, `Update-edge operation ${index + 1} label`, {
+          maxLength: LATTICE_LIMITS.label,
+        })
         break
       case 'remove_edge':
-        needsId()
+        assertKnownKeys(operation, ['type', 'id'], 'Remove-edge operation')
+        assertId(operation.id, `Remove-edge operation ${index + 1} ID`)
         break
       default:
         throw new Error(`Unsupported patch operation type: ${operation.type}`)
@@ -217,6 +294,18 @@ export class LatticeBridge {
     this.editor.setStyleForNextShapes(DefaultSizeStyle, 's')
     this.editor.setStyleForNextShapes(GeoShapeGeoStyle, 'rectangle')
     this.editor.setCurrentTool('geo')
+  }
+
+  undo() {
+    if (!this.editor.canUndo()) return
+    this.editor.undo()
+    this.bumpRevision()
+  }
+
+  redo() {
+    if (!this.editor.canRedo()) return
+    this.editor.redo()
+    this.bumpRevision()
   }
 
   updateSelectedNodeStyle(style: Pick<TLGeoShape['props'], 'color' | 'fill' | 'geo'>) {
@@ -399,10 +488,13 @@ export class LatticeBridge {
 
   createDiagram(input: CreateDiagramInput, signal: AbortSignal) {
     assertNotAborted(signal)
+    this.validateCreateInput(input)
     this.validateDiagram(input.nodes, input.edges ?? [])
     const existing = this.latticeShapes()
     if (existing.length > 0 && !input.replaceExisting) {
-      throw new Error('The canvas is not empty. Set replaceExisting to true to replace it.')
+      throw new Error(
+        'The Lattice diagram is not empty. Set replaceExisting to true to replace its nodes and edges.',
+      )
     }
 
     const edges = input.edges ?? []
@@ -434,10 +526,11 @@ export class LatticeBridge {
 
   applyDiagramPatch(input: ApplyDiagramPatchInput, signal: AbortSignal) {
     assertNotAborted(signal)
+    this.validateApplyInput(input)
     this.assertRevision(input.expectedRevision)
     assertPatchOperations(input.operations)
 
-    const allowedShapeIds = input.targetCommentId
+    const allowedShapeIds = input.targetCommentId !== undefined
       ? new Set(this.commentTargetShapeIds(input.targetCommentId))
       : null
     this.validatePatch(input.operations, allowedShapeIds)
@@ -450,6 +543,7 @@ export class LatticeBridge {
         assertNotAborted(signal)
         switch (operation.type) {
           case 'add_node': {
+            this.assertScopedAddDisallowed(allowedShapeIds, 'add_node')
             assertId(operation.id, 'Node ID')
             assertNodeKind(operation.kind)
             if (this.findBySemanticId(operation.id)) throw new Error(`Element ${operation.id} exists.`)
@@ -491,6 +585,7 @@ export class LatticeBridge {
             break
           }
           case 'add_edge': {
+            this.assertScopedAddDisallowed(allowedShapeIds, 'add_edge')
             assertId(operation.id, 'Edge ID')
             if (this.findBySemanticId(operation.id)) throw new Error(`Element ${operation.id} exists.`)
             this.createEdge(operation)
@@ -529,6 +624,7 @@ export class LatticeBridge {
 
   resolveComment(input: ResolveCommentInput, signal: AbortSignal) {
     assertNotAborted(signal)
+    this.validateResolveInput(input)
     this.assertRevision(input.expectedRevision)
     const thread = getLiveCommentThreads(this.editor).find((item) => item.id === input.commentId)
     if (!thread) throw new Error(`Comment ${input.commentId} was not found.`)
@@ -544,11 +640,54 @@ export class LatticeBridge {
     return { ok: true, commentId: input.commentId, resolved: true, revision: this.state.revision }
   }
 
-  private validateDiagram(nodes: DiagramNodeInput[], edges: DiagramEdgeInput[]) {
-    if (!Array.isArray(nodes) || nodes.length === 0) throw new Error('At least one node is required.')
+  private validateCreateInput(input: unknown): asserts input is CreateDiagramInput {
+    assertRecord(input, 'Create-diagram input')
+    assertKnownKeys(input, ['title', 'replaceExisting', 'nodes', 'edges'], 'Create-diagram input')
+    assertOptionalString(input, 'title', 'Diagram title', { maxLength: LATTICE_LIMITS.title })
+    if ('replaceExisting' in input) assertBoolean(input.replaceExisting, 'replaceExisting')
+    if (!('nodes' in input)) throw new Error('At least one node is required.')
+    if ('edges' in input && input.edges !== undefined) {
+      assertArray(input.edges, 'Diagram edges', LATTICE_LIMITS.edges)
+    }
+  }
+
+  private validateApplyInput(input: unknown): asserts input is ApplyDiagramPatchInput {
+    assertRecord(input, 'Apply-patch input')
+    assertKnownKeys(input, ['expectedRevision', 'targetCommentId', 'operations'], 'Apply-patch input')
+    if (!('expectedRevision' in input)) throw new Error('expectedRevision is required.')
+    assertInteger(input.expectedRevision, 'expectedRevision')
+    assertOptionalString(input, 'targetCommentId', 'targetCommentId', {
+      minLength: 1,
+      maxLength: LATTICE_LIMITS.commentId,
+    })
+    if (!('operations' in input)) throw new Error('At least one patch operation is required.')
+    assertPatchOperations(input.operations)
+  }
+
+  private validateResolveInput(input: unknown): asserts input is ResolveCommentInput {
+    assertRecord(input, 'Resolve-comment input')
+    assertKnownKeys(input, ['commentId', 'expectedRevision'], 'Resolve-comment input')
+    assertString(input.commentId, 'commentId', {
+      minLength: 1,
+      maxLength: LATTICE_LIMITS.commentId,
+    })
+    if (!('expectedRevision' in input)) throw new Error('expectedRevision is required.')
+    assertInteger(input.expectedRevision, 'expectedRevision')
+  }
+
+  private validateDiagram(nodes: unknown, edges: unknown) {
+    assertArray(nodes, 'Diagram nodes', LATTICE_LIMITS.nodes)
+    if (nodes.length === 0) throw new Error('At least one node is required.')
+    assertArray(edges, 'Diagram edges', LATTICE_LIMITS.edges)
     const nodeIds = new Set<string>()
     for (const node of nodes) {
+      assertRecord(node, 'Diagram node')
+      assertKnownKeys(node, ['id', 'label', 'kind'], 'Diagram node')
       assertId(node.id, 'Node ID')
+      assertString(node.label, `Node ${node.id} label`, {
+        minLength: 1,
+        maxLength: LATTICE_LIMITS.label,
+      })
       assertNodeKind(node.kind)
       if (!node.label.trim()) throw new Error(`Node ${node.id} needs a label.`)
       if (nodeIds.has(node.id)) throw new Error(`Duplicate node ID: ${node.id}`)
@@ -556,7 +695,14 @@ export class LatticeBridge {
     }
     const edgeIds = new Set<string>()
     for (const edge of edges) {
+      assertRecord(edge, 'Diagram edge')
+      assertKnownKeys(edge, ['id', 'source', 'target', 'label'], 'Diagram edge')
       assertId(edge.id, 'Edge ID')
+      assertId(edge.source, `Edge ${edge.id} source`)
+      assertId(edge.target, `Edge ${edge.id} target`)
+      assertOptionalString(edge, 'label', `Edge ${edge.id} label`, {
+        maxLength: LATTICE_LIMITS.label,
+      })
       if (edgeIds.has(edge.id)) throw new Error(`Duplicate edge ID: ${edge.id}`)
       if (nodeIds.has(edge.id)) throw new Error(`Element ID ${edge.id} is already in use.`)
       if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
@@ -581,6 +727,7 @@ export class LatticeBridge {
     for (const operation of operations) {
       switch (operation.type) {
         case 'add_node':
+          this.assertScopedAddDisallowed(allowed, 'add_node')
           assertId(operation.id, 'Node ID')
           assertNodeKind(operation.kind)
           if (!operation.label.trim()) throw new Error(`Node ${operation.id} needs a label.`)
@@ -610,6 +757,7 @@ export class LatticeBridge {
           break
         }
         case 'add_edge':
+          this.assertScopedAddDisallowed(allowed, 'add_edge')
           assertId(operation.id, 'Edge ID')
           if (elementIds.has(operation.id)) throw new Error(`Element ${operation.id} exists.`)
           if (!nodes.has(operation.source) || !nodes.has(operation.target)) {
@@ -749,6 +897,12 @@ export class LatticeBridge {
       throw new Error(
         `Stale diagram revision. Expected ${expectedRevision}; current revision is ${this.state.revision}.`,
       )
+    }
+  }
+
+  private assertScopedAddDisallowed(allowed: Set<string> | null, operationType: string) {
+    if (allowed) {
+      throw new Error(`${operationType} is not allowed when targetCommentId is present.`)
     }
   }
 

@@ -1,5 +1,19 @@
 export const NODE_KINDS = ['client', 'service', 'data', 'queue', 'external'] as const
 
+export const LATTICE_DIRECTIONS = ['left', 'right', 'above', 'below'] as const
+
+export const LATTICE_LIMITS = {
+  id: 64,
+  label: 120,
+  title: 120,
+  commentId: 160,
+  nodes: 30,
+  edges: 60,
+  patchOperations: 20,
+} as const
+
+export const LATTICE_ID_PATTERN = '^[a-zA-Z][a-zA-Z0-9_-]{0,63}$'
+
 export type NodeKind = (typeof NODE_KINDS)[number]
 
 export interface DiagramNodeInput {

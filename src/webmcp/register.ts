@@ -5,11 +5,20 @@ import type {
   DiagramScope,
   ResolveCommentInput,
 } from '../lattice/types'
-import { NODE_KINDS } from '../lattice/types'
+import {
+  LATTICE_DIRECTIONS,
+  LATTICE_ID_PATTERN,
+  LATTICE_LIMITS,
+  NODE_KINDS,
+} from '../lattice/types'
 
-const DIRECTION = ['left', 'right', 'above', 'below'] as const
-const id = { type: 'string', minLength: 1, maxLength: 64 }
-const label = { type: 'string', minLength: 1, maxLength: 120 }
+const id = {
+  type: 'string',
+  minLength: 1,
+  maxLength: LATTICE_LIMITS.id,
+  pattern: LATTICE_ID_PATTERN,
+}
+const label = { type: 'string', minLength: 1, maxLength: LATTICE_LIMITS.label }
 const nodeKind = { type: 'string', enum: NODE_KINDS }
 
 function objectSchema(properties: Record<string, unknown>, required: string[] = []) {
@@ -67,26 +76,26 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
       name: 'create_diagram',
       title: 'Create an architecture diagram',
       description:
-        'Create and lay out a typed architecture diagram. Refuses to replace a non-empty canvas unless replaceExisting is true.',
+        'Create and lay out a typed architecture diagram. With replaceExisting true, replaces Lattice diagram nodes and edges while preserving ordinary tldraw objects and comments.',
       inputSchema: objectSchema(
         {
-          title: { type: 'string', maxLength: 120 },
+          title: { type: 'string', maxLength: LATTICE_LIMITS.title },
           replaceExisting: { type: 'boolean' },
           nodes: {
             type: 'array',
             minItems: 1,
-            maxItems: 30,
+            maxItems: LATTICE_LIMITS.nodes,
             items: objectSchema({ id, label, kind: nodeKind }, ['id', 'label', 'kind']),
           },
           edges: {
             type: 'array',
-            maxItems: 60,
+            maxItems: LATTICE_LIMITS.edges,
             items: objectSchema(
               {
                 id,
                 source: id,
                 target: id,
-                label: { type: 'string', maxLength: 120 },
+                label: { type: 'string', maxLength: LATTICE_LIMITS.label },
               },
               ['id', 'source', 'target'],
             ),
@@ -111,13 +120,13 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
           targetCommentId: {
             type: 'string',
             minLength: 1,
-            maxLength: 160,
+            maxLength: LATTICE_LIMITS.commentId,
             description: 'Comment whose captured target bounds this patch.',
           },
           operations: {
             type: 'array',
             minItems: 1,
-            maxItems: 20,
+            maxItems: LATTICE_LIMITS.patchOperations,
             items: {
               oneOf: [
                 objectSchema(
@@ -127,7 +136,7 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
                     label,
                     kind: nodeKind,
                     near: id,
-                    direction: { type: 'string', enum: DIRECTION },
+                    direction: { type: 'string', enum: LATTICE_DIRECTIONS },
                   },
                   ['type', 'id', 'label', 'kind'],
                 ),
@@ -150,7 +159,7 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
                     id,
                     source: id,
                     target: id,
-                    label: { type: 'string', maxLength: 120 },
+                    label: { type: 'string', maxLength: LATTICE_LIMITS.label },
                   },
                   ['type', 'id', 'source', 'target'],
                 ),
@@ -158,7 +167,7 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
                   {
                     type: { type: 'string', const: 'update_edge' },
                     id,
-                    label: { type: 'string', maxLength: 120 },
+                    label: { type: 'string', maxLength: LATTICE_LIMITS.label },
                   },
                   ['type', 'id', 'label'],
                 ),
@@ -191,7 +200,7 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
           commentId: {
             type: 'string',
             minLength: 1,
-            maxLength: 160,
+            maxLength: LATTICE_LIMITS.commentId,
             description: 'Exact unresolved comment thread ID.',
           },
           expectedRevision: { type: 'integer', minimum: 0 },

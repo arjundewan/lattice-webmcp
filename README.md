@@ -35,7 +35,7 @@ npm run build
 The top-level page registers four narrow tools with `document.modelContext.registerTool`:
 
 - `get_diagram` reads the current semantic graph, selection, revision, and unresolved comments.
-- `create_diagram` creates and lays out a typed graph, refusing to replace existing content unless explicitly permitted.
+- `create_diagram` creates and lays out a typed graph. With `replaceExisting: true`, it replaces Lattice diagram nodes and edges only; ordinary tldraw objects and comments are preserved.
 - `apply_diagram_patch` applies explicit node and edge operations at an expected revision. When scoped to a comment, edits are restricted to that comment's captured element IDs.
 - `resolve_comment` closes one comment at an expected revision after its requested change is complete.
 

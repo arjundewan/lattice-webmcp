@@ -16,18 +16,14 @@ function objectSchema(properties: Record<string, unknown>, required: string[] = 
   return { type: 'object', properties, required, additionalProperties: false }
 }
 
-function result(value: unknown) {
-  return JSON.stringify(value)
-}
-
 async function executeSafely(action: () => unknown | Promise<unknown>) {
   try {
-    return result(await action())
+    return await action()
   } catch (error) {
-    return result({
+    return {
       ok: false,
       error: error instanceof Error ? error.message : 'The Lattice tool failed.',
-    })
+    }
   }
 }
 

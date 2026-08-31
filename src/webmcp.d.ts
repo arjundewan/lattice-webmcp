@@ -10,7 +10,7 @@ declare global {
       readOnlyHint?: boolean
       untrustedContentHint?: boolean
     }
-    execute(input: unknown, context?: { signal: AbortSignal }): string | Promise<string>
+    execute(input: unknown, context?: { signal: AbortSignal }): unknown | Promise<unknown>
   }
 
   interface WebMcpModelContext extends EventTarget {

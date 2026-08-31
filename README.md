@@ -37,7 +37,7 @@ The top-level page registers four narrow tools with `document.modelContext.regis
 - `get_diagram` reads the current semantic graph, selection, revision, and unresolved comments.
 - `create_diagram` creates and lays out a typed graph. With `replaceExisting: true`, it replaces Lattice diagram nodes and edges only; ordinary tldraw objects and comments are preserved.
 - `apply_diagram_patch` applies explicit node and edge operations at an expected revision. When scoped to a comment, edits are restricted to that comment's captured element IDs.
-- `resolve_comment` closes one comment at an expected revision after its requested change is complete.
+- `resolve_comment` closes one comment only after a successful target-scoped patch addressed it at the expected current revision.
 
 Tool schemas use bounded inputs, mutation annotations, stable semantic IDs, and deterministic JSON results. The implementation follows the challenge's linked [WebMCP specification](https://webmachinelearning.github.io/webmcp/), [OpenAI guide](https://learn.chatgpt.com/docs/webmcp), [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api), and [tool security guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools).
 

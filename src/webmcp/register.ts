@@ -194,7 +194,7 @@ export function registerLatticeTools(getBridge: () => LatticeBridge | null) {
       name: 'resolve_comment',
       title: 'Resolve a diagram comment',
       description:
-        'Resolve one comment at the expected diagram revision after its requested change has been applied.',
+        'Resolve one comment only after a successful target-scoped patch addressed it at the expected current diagram revision.',
       inputSchema: objectSchema(
         {
           commentId: {

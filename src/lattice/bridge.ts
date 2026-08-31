@@ -231,6 +231,7 @@ function assertPatchOperations(value: unknown): asserts value is PatchOperation[
 
 export class LatticeBridge {
   private isDrawingNode = false
+  private readonly addressedCommentRevisions = new Map<string, number>()
   private readonly restoreInitialShapeMeta: () => void
   private commentPointerStart: {
     point: { x: number; y: number }
@@ -579,6 +580,9 @@ export class LatticeBridge {
             const connected = this.edgeShapes().filter(
               ({ meta }) => meta.source === operation.id || meta.target === operation.id,
             )
+            connected.forEach(({ shape, meta }) =>
+              this.assertTargetAllows(shape.id, allowedShapeIds, meta.id),
+            )
             this.editor.deleteShapes([node.shape.id, ...connected.map(({ shape }) => shape.id)])
             changedNodeIds.add(operation.id)
             connected.forEach(({ meta }) => changedEdgeIds.add(meta.id))
@@ -614,6 +618,10 @@ export class LatticeBridge {
       }
     })
 
+    if (input.targetCommentId !== undefined) {
+      this.addressedCommentRevisions.set(input.targetCommentId, this.state.revision)
+    }
+
     void addedNodeIds
     return {
       ok: true,
@@ -629,6 +637,11 @@ export class LatticeBridge {
     const thread = getLiveCommentThreads(this.editor).find((item) => item.id === input.commentId)
     if (!thread) throw new Error(`Comment ${input.commentId} was not found.`)
     if (thread.resolved) throw new Error(`Comment ${input.commentId} is already resolved.`)
+    if (this.addressedCommentRevisions.get(input.commentId) !== input.expectedRevision) {
+      throw new Error(
+        `Comment ${input.commentId} must be addressed by a successful target-scoped patch at the current revision before it can be resolved.`,
+      )
+    }
 
     this.state.isMutating = true
     try {
@@ -750,6 +763,7 @@ export class LatticeBridge {
           elementIds.delete(operation.id)
           for (const [edgeId, edge] of edges) {
             if (edge.source === operation.id || edge.target === operation.id) {
+              this.assertTargetAllows(edge.shapeId, allowed, edgeId)
               edges.delete(edgeId)
               elementIds.delete(edgeId)
             }

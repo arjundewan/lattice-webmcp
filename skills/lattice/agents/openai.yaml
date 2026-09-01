@@ -1,0 +1,7 @@
+interface:
+  display_name: "Lattice"
+  short_description: "Review or create a Lattice board"
+  default_prompt: "Use $lattice to review the current board or create a diagram from a specified goal."
+
+policy:
+  allow_implicit_invocation: false

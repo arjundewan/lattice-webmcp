@@ -13,6 +13,8 @@ npm install
 npm run dev
 ```
 
+The hosted app is available at [lattice-webmcp.vercel.app](https://lattice-webmcp.vercel.app).
+
 Open the printed local URL in a WebMCP-capable browser. Each new session receives a stable `/d/:id` URL and persists in that browser's local storage.
 
 Useful checks:
@@ -22,13 +24,39 @@ npm run typecheck
 npm run build
 ```
 
+## Lightweight agent skill
+
+Lattice works best with the lightweight `/lattice` skill. It keeps the agent
+workflow simple without requiring users to mention WebMCP tools:
+
+- `/lattice` reads the current board and handles unresolved annotations as
+  requests, questions, observations, or concerns.
+- `/lattice create a new board to do XYZ` creates a typed architecture diagram
+  from the supplied goal.
+
+The skill is optional; any WebMCP-capable agent can use the page tools directly.
+When starting from a new agent session, `/lattice create ...` opens the hosted
+app before creating a fresh board, while bare `/lattice` uses the currently
+open board.
+The portable skill definition lives at [`skills/lattice/SKILL.md`](skills/lattice/SKILL.md).
+
 ## Demo the collaboration loop
+
+### Direct WebMCP flow
 
 1. In a WebMCP-capable browser, ask the agent: “Create a basic realtime collaboration architecture on this canvas.”
 2. Move a node to show that the result is ordinary editable canvas content.
 3. Select one or more elements, choose the comment tool, place the comment, and submit a request. Dragging instead captures a freeform region and the elements intersecting it.
 4. Tell the agent: “I added a comment. Please address it.”
 5. The agent reads the comment and its frozen target, applies a narrow patch, and resolves the thread. Unrelated shapes and positions remain unchanged.
+
+### Lightweight skill flow
+
+1. In a WebMCP-capable browser, invoke `/lattice create a basic realtime collaboration architecture`.
+2. Move a node to show that the result is ordinary editable canvas content.
+3. Select one or more elements, choose the comment tool, place the comment, and submit a request. Dragging instead captures a freeform region and the elements intersecting it.
+4. Invoke `/lattice`.
+5. The skill reads the comment and its frozen target, applies a narrow patch when appropriate, and resolves concrete change requests. Questions and observations are answered without mutating the board.
 
 ## WebMCP tools
 

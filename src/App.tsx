@@ -51,7 +51,6 @@ const COMMENT_TOOLS = [
 ]
 
 interface LatticeUiContextValue {
-  title: string
   beginNodeDraw(): void
   beginComment(): void
   undo(): void
@@ -202,7 +201,7 @@ function NodeStylePanel() {
 
 function CanvasChrome() {
   const editor = useEditor()
-  const { title, beginNodeDraw, beginComment, undo, redo } = useLatticeUi()
+  const { beginNodeDraw, beginComment, undo, redo } = useLatticeUi()
   const currentTool = useValue('current tool', () => editor.getCurrentToolId(), [editor])
   const shapeCount = useValue('shape count', () => editor.getCurrentPageShapes().length, [editor])
   const openComments = useValue(
@@ -220,7 +219,6 @@ function CanvasChrome() {
           </div>
           <div>
             <div className="brand-name">Lattice</div>
-            <div className="document-title">{title}</div>
           </div>
         </div>
       </header>
@@ -269,28 +267,30 @@ function CanvasChrome() {
         </ToolButton>
       </div>
 
-      <div className="history-toolbar" role="toolbar" aria-label="Edit history">
-        <ToolButton label="Undo" onClick={undo}>
-          <Undo2 size={17} />
-        </ToolButton>
-        <ToolButton label="Redo" onClick={redo}>
-          <Redo2 size={17} />
-        </ToolButton>
-      </div>
+      <div className="bottom-left-controls">
+        <div className="history-toolbar" role="toolbar" aria-label="Edit history">
+          <ToolButton label="Undo" onClick={undo}>
+            <Undo2 size={17} />
+          </ToolButton>
+          <ToolButton label="Redo" onClick={redo}>
+            <Redo2 size={17} />
+          </ToolButton>
+        </div>
 
-      <div className="zoom-toolbar" role="toolbar" aria-label="Canvas view">
-        <ToolButton label="Zoom out" onClick={() => editor.zoomOut()}>
-          <ZoomOut size={17} />
-        </ToolButton>
-        <ToolButton
-          label="Fit diagram"
-          onClick={() => editor.zoomToFit({ animation: { duration: 180 } })}
-        >
-          <Scan size={17} />
-        </ToolButton>
-        <ToolButton label="Zoom in" onClick={() => editor.zoomIn()}>
-          <ZoomIn size={17} />
-        </ToolButton>
+        <div className="zoom-toolbar" role="toolbar" aria-label="Canvas view">
+          <ToolButton label="Zoom out" onClick={() => editor.zoomOut()}>
+            <ZoomOut size={17} />
+          </ToolButton>
+          <ToolButton
+            label="Fit diagram"
+            onClick={() => editor.zoomToFit({ animation: { duration: 180 } })}
+          >
+            <Scan size={17} />
+          </ToolButton>
+          <ToolButton label="Zoom in" onClick={() => editor.zoomIn()}>
+            <ZoomIn size={17} />
+          </ToolButton>
+        </div>
       </div>
       <NodeStylePanel />
     </>
@@ -338,8 +338,6 @@ export function App() {
     selectionAtCommentStart: [],
   })
   const persistTimerRef = useRef<number | null>(null)
-  const [title, setTitle] = useState(initial.title)
-
   const persistNow = useCallback(() => {
     persistDocument(
       store,
@@ -363,7 +361,6 @@ export function App() {
         onDocumentChanged: schedulePersist,
         onTitleChanged(nextTitle) {
           bridgeStateRef.current.title = nextTitle
-          setTitle(nextTitle)
         },
       })
       bridgeRef.current = bridge
@@ -440,7 +437,6 @@ export function App() {
 
   const ui = useMemo<LatticeUiContextValue>(
     () => ({
-      title,
       beginNodeDraw() {
         bridgeRef.current?.beginNodeDraw()
       },
@@ -457,7 +453,7 @@ export function App() {
         bridgeRef.current?.updateSelectedNodeStyle(style)
       },
     }),
-    [title],
+    [],
   )
 
   const handlePointerDownCapture = useCallback((event: ReactPointerEvent<HTMLElement>) => {
